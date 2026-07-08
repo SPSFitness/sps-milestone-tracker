@@ -12,10 +12,13 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: "" };
   }
 
-  const store = getStore("milestones");
-
   try {
-    // GET — return all celebrated milestones
+    const store = getStore({
+      name: "milestones",
+      siteID: process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_TOKEN,
+    });
+
     if (event.httpMethod === "GET") {
       const existing = await store.get("celebrated", { type: "json" }).catch(() => ({}));
       return {
@@ -25,7 +28,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // POST — mark a milestone as celebrated
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body || "{}");
       const { name, milestone, celebrated_by, notes } = body;
@@ -38,13 +40,7 @@ exports.handler = async (event) => {
       const key = `${name}|${milestone}`;
       const date = new Date().toLocaleDateString("en-GB");
 
-      existing[key] = {
-        name,
-        milestone,
-        date,
-        by: celebrated_by || "SPS",
-        notes: notes || "",
-      };
+      existing[key] = { name, milestone, date, by: celebrated_by || "SPS", notes: notes || "" };
 
       await store.setJSON("celebrated", existing);
 
