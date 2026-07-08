@@ -60,23 +60,23 @@ exports.handler = async (event) => {
   };
 
   try {
-    const store = getStore("milestones");
+    const store = getStore({
+      name: "milestones",
+      siteID: process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_TOKEN,
+    });
 
-    // Load cached event type lookup so we don't re-fetch known events
     const cachedEventTypes = await store.get("event-types", { type: "json" }).catch(() => ({}));
     const eventOfferingType = cachedEventTypes || {};
 
-    // Get customers
     const customers = await fetchAllPages("https://goteamup.com/api/v2/customers?per_page=100");
     const idToName = {};
     for (const c of customers) {
       idToName[c.id] = `${c.first_name} ${c.last_name}`.trim();
     }
 
-    // Get all attendances
     const attendances = await fetchAllPages("https://goteamup.com/api/v2/attendances?per_page=100&status=attended");
 
-    // Only look up event types we haven't cached yet
     const unknownEventIds = [...new Set(attendances.map(a => a.event))].filter(id => !(id in eventOfferingType));
 
     for (let i = 0; i < unknownEventIds.length; i += 10) {
@@ -92,10 +92,8 @@ exports.handler = async (event) => {
       }
     }
 
-    // Save updated event type cache
     await store.setJSON("event-types", eventOfferingType);
 
-    // Count per customer filtered to our 3 class types
     const attendanceCounts = {};
     for (const a of attendances) {
       if (OFFERING_TYPES.has(eventOfferingType[a.event])) {
@@ -103,7 +101,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Build results
     const results = Object.entries(PT_MINDER).map(([name, ptm]) => {
       const custId = Object.keys(idToName).find(id => idToName[id] === name);
       const gtu = custId ? (attendanceCounts[parseInt(custId)] || 0) : 0;
@@ -125,7 +122,6 @@ exports.handler = async (event) => {
 
     results.sort((a, b) => a.toNext - b.toNext);
 
-    // Cache the result
     await store.setJSON("sync-result", {
       members: results,
       synced_at: new Date().toISOString(),
@@ -139,10 +135,12 @@ exports.handler = async (event) => {
 
   } catch (err) {
     console.error("sync error:", err);
-
-    // On error, try to return cached result
     try {
-      const store = getStore("milestones");
+      const store = getStore({
+        name: "milestones",
+        siteID: process.env.NETLIFY_SITE_ID,
+        token: process.env.NETLIFY_TOKEN,
+      });
       const cached = await store.get("sync-result", { type: "json" });
       if (cached) return { statusCode: 200, headers, body: JSON.stringify(cached) };
     } catch {}
