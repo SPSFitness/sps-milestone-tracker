@@ -1,4 +1,57 @@
+const fetch = require("node-fetch");
 const { getStore } = require("@netlify/blobs");
+
+const PT_MINDER = {
+  "Damian Pogson":829,"Sam Brunt":648,"Baljit Sahota":647,"Nicola Heath":645,
+  "Satnam Seehra":636,"April Philips":633,"Hannah Osborne":614,"Sarah Baugh":583,
+  "Sam Averall":552,"Alexa Phipson":468,"Victoria Hubball":425,"Sonia Dulay":390,
+  "Sarah Austin":390,"Stacey Stockton":377,"Karen Jackson":368,"Michelle King":357,
+  "Dawn Dixon":342,"Leanne Tighe":342,"Chas Seehra":336,"Dawn Davis":318,
+  "Emily Roberts":310,"Amrit Dulay":293,"Joanne Hathaway":287,"Paul Shoker":281,
+  "Trevor Rawlins":280,"Paul Ralph":266,"Caroline Williamson":253,"Jo Dimmock":248,
+  "Kate Bailey":239,"Natalie Lewis":233,"Seema Faulkner":226,"Liz Hurst":219,
+  "Julie Hadley":219,"Alison Lees":216,"Jane Shearwood":209,"Helen Williams":194,
+  "Claire Devonport":194,"Cara Doherty":194,"Emma Foster":193,"Richard Cahalane":193,
+  "Joanne Clewes":191,"Joanne Hume-Billingham":185,"Jo Hughes":183,"Paula Beddard":181,
+  "Yvonne Price":178,"Nick Roche":166,"Jaynie Berry":163,"Clare Stafford":160,
+  "Kelly Guest - Southwick":159,"Trey Kaur":159,"Richard Davis":158,"Julie Street":157,
+  "Nikki Price":156,"Rebecca Barnfield":154,"Becky Bradley":149,"Sonia Qaiser":145,
+  "Sam Grove":145,"Hollie Carter":145,"Katie Rose":135,"Rachel Rolands":134,
+  "Dave Shoker":132,"Nigel Meehan":131,"Libby Robinson":125,"Amanda Owen":120,
+  "Simran Kaur":116,"Diane Williams":116,"Angie Wood":111,"Nina Stafford":110,
+  "Lisa Williams":108,"Chris Pile":106,"Louise Harris":101,"Kerry Finnegan":94,
+  "Lucy Bayliss":90,"Seema Pabla":86,"Nadia Malik":79,"Sarah Raine":77,
+  "Kam Arora":71,"Dawn Humphries":70,"Sam Ryder":70,"Stacey Dingley":67,
+  "Kara Sheldon":62,"Mark Whitehouse":62,"Elizabeth Edwards":60,"Chris Roberts":60,
+  "Kate Healy":57,"Rebecca Houghton":56,"Lin Betts":50,"Jo Kennett":48,
+  "Taran Chana":41,"Robbie Kinsey":35,"Christina Santos":34,"Chloe Fowkes":33,
+  "Natalie Hemus":32,"Davinia George":32,"Karen Martin":32,"Susan Bryan":29,
+  "Gayle Norton":27,"Jerome Harris":26,"Laura Staten":24,"Shannon Roach":19,
+  "Sheree Bate":18,"Simran Hothi":17,"Amanda Cook":13,"Lucie Bissell":9,
+  "Tom Bissell":9,"Natalie Armstrong":7,"Rachel Bradley":6,"Pinda Sanghera":3,
+  "Ranjit Bhathal":3,
+};
+
+const OFFERING_TYPES = new Set([293920, 293937, 293923]);
+
+const GTU_HEADERS = {
+  Authorization: `Token ${process.env.GTU_M2M_TOKEN}`,
+  "TeamUp-Request-Mode": "provider",
+  "TeamUp-Provider-ID": "12086776",
+  "Accept": "application/json",
+};
+
+async function fetchAllPages(url) {
+  let results = [];
+  let nextUrl = url;
+  while (nextUrl) {
+    const res = await fetch(nextUrl, { headers: GTU_HEADERS });
+    const data = await res.json();
+    results = results.concat(data.results || []);
+    nextUrl = data.next || null;
+  }
+  return results;
+}
 
 exports.handler = async (event) => {
   const headers = {
@@ -8,26 +61,92 @@ exports.handler = async (event) => {
 
   try {
     const store = getStore("milestones");
-    const cached = await store.get("sync-result", { type: "json" }).catch(() => null);
 
-    if (!cached) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          members: [],
-          synced_at: null,
-          message: "Sync in progress, refresh in 60 seconds"
-        }),
-      };
+    // Load cached event type lookup so we don't re-fetch known events
+    const cachedEventTypes = await store.get("event-types", { type: "json" }).catch(() => ({}));
+    const eventOfferingType = cachedEventTypes || {};
+
+    // Get customers
+    const customers = await fetchAllPages("https://goteamup.com/api/v2/customers?per_page=100");
+    const idToName = {};
+    for (const c of customers) {
+      idToName[c.id] = `${c.first_name} ${c.last_name}`.trim();
     }
+
+    // Get all attendances
+    const attendances = await fetchAllPages("https://goteamup.com/api/v2/attendances?per_page=100&status=attended");
+
+    // Only look up event types we haven't cached yet
+    const unknownEventIds = [...new Set(attendances.map(a => a.event))].filter(id => !(id in eventOfferingType));
+
+    for (let i = 0; i < unknownEventIds.length; i += 10) {
+      const batch = unknownEventIds.slice(i, i + 10);
+      const evResults = await Promise.all(
+        batch.map(id =>
+          fetch(`https://goteamup.com/api/v2/events/${id}`, { headers: GTU_HEADERS })
+            .then(r => r.json()).catch(() => null)
+        )
+      );
+      for (const ev of evResults) {
+        if (ev && ev.id) eventOfferingType[ev.id] = ev.offering_type;
+      }
+    }
+
+    // Save updated event type cache
+    await store.setJSON("event-types", eventOfferingType);
+
+    // Count per customer filtered to our 3 class types
+    const attendanceCounts = {};
+    for (const a of attendances) {
+      if (OFFERING_TYPES.has(eventOfferingType[a.event])) {
+        attendanceCounts[a.customer] = (attendanceCounts[a.customer] || 0) + 1;
+      }
+    }
+
+    // Build results
+    const results = Object.entries(PT_MINDER).map(([name, ptm]) => {
+      const custId = Object.keys(idToName).find(id => idToName[id] === name);
+      const gtu = custId ? (attendanceCounts[parseInt(custId)] || 0) : 0;
+      const total = ptm + gtu;
+      const lastMilestone = Math.floor(total / 100) * 100;
+      const nextMilestone = lastMilestone + 100;
+      return { name, ptm, gtu, total, lastMilestone, nextMilestone, toNext: nextMilestone - total };
+    });
+
+    for (const [custId, count] of Object.entries(attendanceCounts)) {
+      const name = idToName[custId];
+      if (name && !PT_MINDER[name] && count > 0) {
+        const total = count;
+        const lastMilestone = Math.floor(total / 100) * 100;
+        const nextMilestone = lastMilestone + 100;
+        results.push({ name, ptm: 0, gtu: count, total, lastMilestone, nextMilestone, toNext: nextMilestone - total });
+      }
+    }
+
+    results.sort((a, b) => a.toNext - b.toNext);
+
+    // Cache the result
+    await store.setJSON("sync-result", {
+      members: results,
+      synced_at: new Date().toISOString(),
+    });
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(cached),
+      body: JSON.stringify({ members: results, synced_at: new Date().toISOString() }),
     };
+
   } catch (err) {
+    console.error("sync error:", err);
+
+    // On error, try to return cached result
+    try {
+      const store = getStore("milestones");
+      const cached = await store.get("sync-result", { type: "json" });
+      if (cached) return { statusCode: 200, headers, body: JSON.stringify(cached) };
+    } catch {}
+
     return {
       statusCode: 500,
       headers,
