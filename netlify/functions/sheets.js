@@ -20,11 +20,12 @@ exports.handler = async (event) => {
     });
 
     if (event.httpMethod === "GET") {
-      const existing = await store.get("celebrated", { type: "json" }).catch(() => ({}));
+      const raw = await store.get("celebrated").catch(() => null);
+      const existing = raw ? JSON.parse(raw) : {};
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ records: existing || {} }),
+        body: JSON.stringify({ records: existing }),
       };
     }
 
@@ -36,13 +37,14 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing name or milestone" }) };
       }
 
-      const existing = await store.get("celebrated", { type: "json" }).catch(() => ({}));
+      const raw = await store.get("celebrated").catch(() => null);
+      const existing = raw ? JSON.parse(raw) : {};
       const key = `${name}|${milestone}`;
       const date = new Date().toLocaleDateString("en-GB");
 
       existing[key] = { name, milestone, date, by: celebrated_by || "SPS", notes: notes || "" };
 
-      await store.setJSON("celebrated", existing);
+      await store.set("celebrated", JSON.stringify(existing));
 
       return {
         statusCode: 200,
