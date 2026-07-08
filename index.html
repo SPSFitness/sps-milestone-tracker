@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPS Fitness — Milestone Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blue: #1a4dff;
+      --blue-dark: #0d2e99;
+      --teal: #23ccda;
+      --black: #0a0a0a;
+      --white: #ffffff;
+      --grey-50: #f7f7f8;
+      --grey-100: #efefef;
+      --grey-300: #d1d1d6;
+      --grey-500: #8e8e93;
+      --grey-700: #3a3a3c;
+      --gold: #f5c518;
+      --gold-bg: #fffbe6;
+      --green: #34c759;
+      --green-bg: #f0faf2;
+      --orange: #ff9500;
+      --orange-bg: #fff8ee;
+      --red: #c00000;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--black);
+      color: var(--white);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--black);
+      border-bottom: 1px solid #1c1c1e;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-badge {
+      background: var(--blue);
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .sync-btn {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      color: var(--white);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    .sync-btn:hover { background: #2c2c2e; }
+    .sync-btn.syncing { opacity: 0.6; pointer-events: none; }
+
+    .sync-icon { font-size: 14px; }
+    .sync-icon.spinning { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Main layout ── */
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--grey-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .stat-value.blue { color: var(--blue); }
+    .stat-value.gold { color: var(--gold); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.orange { color: var(--orange); }
+
+    /* ── Section ── */
+    .section { margin-bottom: 28px; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .section-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--grey-500);
+    }
+
+    .section-count {
+      background: #2c2c2e;
+      color: var(--grey-500);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    /* ── Member cards ── */
+    .member-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .member-card {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: border-color 0.15s;
+    }
+
+    .member-card:hover { border-color: #3a3a3c; }
+
+    .member-card.celebrated {
+      background: #0f1f0f;
+      border-color: #1a3a1a;
+    }
+
+    .member-card.next-up {
+      background: #1a1400;
+      border-color: #3a2e00;
+    }
+
+    .member-card.imminent {
+      background: #1a0f00;
+      border-color: #3a2000;
+    }
+
+    .member-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .member-info { flex: 1; min-width: 0; }
+
+    .member-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .member-meta {
+      font-size: 12px;
+      color: var(--grey-500);
+      margin-top: 2px;
+    }
+
+    .milestone-badge {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      flex-shrink: 0;
+      min-width: 52px;
+      text-align: right;
+    }
+
+    .progress-wrap {
+      width: 100px;
+      flex-shrink: 0;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: #2c2c2e;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-label {
+      font-size: 11px;
+      color: var(--grey-500);
+      text-align: right;
+    }
+
+    .celebrate-btn {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    .celebrate-btn:hover { background: var(--blue-dark); }
+    .celebrate-btn:active { transform: scale(0.97); }
+    .celebrate-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+    .done-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+
+    /* ── Auth screen ── */
+    .auth-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+      gap: 16px;
+    }
+
+    .auth-screen h2 { font-size: 22px; font-weight: 700; }
+    .auth-screen p { color: var(--grey-500); font-size: 14px; }
+
+    .auth-btn {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* ── Loading ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40vh;
+      color: var(--grey-500);
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    /* ── Sync time ── */
+    .sync-time {
+      font-size: 11px;
+      color: var(--grey-500);
+      text-align: right;
+      margin-bottom: 20px;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 200;
+      white-space: nowrap;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 150;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .modal p { font-size: 13px; color: var(--grey-500); margin-bottom: 20px; }
+
+    .modal-input {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid #2c2c2e;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      margin-bottom: 12px;
+    }
+
+    .modal-input:focus { outline: none; border-color: var(--blue); }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    .modal-cancel {
+      background: #2c2c2e;
+      border: none;
+      color: white;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .modal-confirm {
+      background: var(--blue);
+      border: none;
+      color: white;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .progress-wrap { display: none; }
+      main { padding: 20px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-badge">S</div>
+    SPS Milestone Tracker
+  </div>
+  <button class="sync-btn" id="syncBtn" onclick="syncData()">
+    <span class="sync-icon" id="syncIcon">↻</span>
+    Sync Go Team Up
+  </button>
+</header>
+
+<main id="app">
+  <div class="loading">Loading...</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Mark as Celebrated</h3>
+    <p id="modalSubtitle"></p>
+    <input class="modal-input" id="modalName" placeholder="Your name (optional)" />
+    <input class="modal-input" id="modalNotes" placeholder="Notes (optional)" />
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmCelebrate()">Mark Celebrated 🎉</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let state = {
+    members: [],
+    celebrated: {}, // name+milestone -> { date, by }
+    synced_at: null,
+    auth_url: null,
+  };
+
+  // Known ex-members (won't appear in tracker)
+  const EX_MEMBERS = new Set(["Kiran Shoker"]);
+
+  // Recently celebrated (shown with ⭐)
+  const RECENTLY_CELEBRATED = new Set(["Trey Kaur|200", "Sam Grove|200"]);
+
+  // Next to celebrate list (pre-seeded)
+  const NEXT_TO_CELEBRATE_SEEDS = [
+    { name: "Kelly Guest - Southwick", milestone: 200 },
+    { name: "Nicola Heath", milestone: 700 },
+    { name: "Richard Davis", milestone: 200 },
+    { name: "Rebecca Barnfield", milestone: 200 },
+    { name: "Jo Kennett", milestone: 100 },
+    { name: "Rebecca Houghton", milestone: 100 },
+    { name: "April Philips", milestone: 700 },
+    { name: "Sam Averall", milestone: 600 },
+  ];
+
+  let pendingCelebrate = null;
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    await loadCelebrated();
+    await syncData(true);
+  }
+
+  async function loadCelebrated() {
+    try {
+      const res = await fetch("/api/sheets");
+      const data = await res.json();
+      state.celebrated = {};
+      for (const r of data.records || []) {
+        if (r.celebrated) {
+          state.celebrated[`${r.name}|${r.milestone}`] = { date: r.celebrated_date, by: r.celebrated_by };
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load sheets data", e);
+    }
+  }
+
+  async function syncData(silent = false) {
+    // M2M token — no auth flow needed
+    const btn = document.getElementById("syncBtn");
+    const icon = document.getElementById("syncIcon");
+    btn.classList.add("syncing");
+    icon.classList.add("spinning");
+
+    try {
+      const res = await fetch("/api/gtu-sync");
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+
+      state.members = (data.members || []).filter(m => !EX_MEMBERS.has(m.name));
+      state.synced_at = data.synced_at;
+
+      render();
+      if (!silent) showToast("✓ Synced with Go Team Up");
+    } catch (e) {
+      if (!silent) showToast("⚠ Sync failed — " + e.message);
+      // Still render with whatever we have
+      render();
+    } finally {
+      btn.classList.remove("syncing");
+      icon.classList.remove("spinning");
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function render() {
+    const app = document.getElementById("app");
+
+    // Categorise members
+    const recentlyCelebrated = [];
+    const nextToCheck = new Set(NEXT_TO_CELEBRATE_SEEDS.map(s => `${s.name}|${s.milestone}`));
+    const nextToCelebrate = [];
+    const imminent = [];
+
+    // Recently celebrated (from seeds)
+    for (const key of RECENTLY_CELEBRATED) {
+      const [name] = key.split("|");
+      const member = state.members.find(m => m.name === name) || { name, total: 0, gtu: 0, ptm: 0 };
+      recentlyCelebrated.push({ ...member, key });
+    }
+
+    // Next to celebrate seeds (not yet done)
+    for (const seed of NEXT_TO_CELEBRATE_SEEDS) {
+      const key = `${seed.name}|${seed.milestone}`;
+      const alreadyCelebrated = state.celebrated[key];
+      const member = state.members.find(m => m.name === seed.name) || { name: seed.name, total: "?", ptm: 0, gtu: 0 };
+      nextToCelebrate.push({ ...member, milestone: seed.milestone, celebrated: alreadyCelebrated, key });
+    }
+
+    // Imminent — within 15, not in other lists
+    const trackedNames = new Set([
+      ...RECENTLY_CELEBRATED,
+      ...NEXT_TO_CELEBRATE_SEEDS.map(s => s.name),
+    ]);
+
+    for (const m of state.members) {
+      if (trackedNames.has(m.name)) continue;
+      if (m.toNext <= 15) {
+        imminent.push(m);
+      }
+    }
+    imminent.sort((a, b) => a.toNext - b.toNext);
+
+    // Stats
+    const totalMembers = state.members.length;
+    const totalSessions = state.members.reduce((s, m) => s + (m.total || 0), 0);
+    const celebratedCount = Object.keys(state.celebrated).length + RECENTLY_CELEBRATED.size;
+    const imminentCount = imminent.length + nextToCelebrate.filter(n => !n.celebrated).length;
+
+    app.innerHTML = `
+      ${state.synced_at ? `<div class="sync-time">Last synced: ${new Date(state.synced_at).toLocaleString("en-GB")}</div>` : ""}
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-label">Members</div>
+          <div class="stat-value blue">${totalMembers}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Sessions</div>
+          <div class="stat-value blue">${totalSessions.toLocaleString()}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Milestones Done</div>
+          <div class="stat-value green">${celebratedCount}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Coming Up</div>
+          <div class="stat-value orange">${imminentCount}</div>
+        </div>
+      </div>
+
+      ${renderSection("RECENTLY CELEBRATED", "#34c759", recentlyCelebrated.map(m => renderCelebratedCard(m)), recentlyCelebrated.length)}
+      ${renderSection("NEXT TO CELEBRATE", "#c00000", nextToCelebrate.map(m => renderNextCard(m)), nextToCelebrate.length)}
+      ${imminent.length ? renderSection("IMMINENT — WITHIN 15 SESSIONS", "#ff9500", imminent.map(m => renderImminentCard(m)), imminent.length) : ""}
+    `;
+  }
+
+  function renderSection(title, colour, cards, count) {
+    return `
+      <div class="section">
+        <div class="section-header">
+          <div class="section-dot" style="background:${colour}"></div>
+          <div class="section-title">${title}</div>
+          <div class="section-count">${count}</div>
+        </div>
+        <div class="member-list">${cards.join("")}</div>
+      </div>
+    `;
+  }
+
+  function initials(name) {
+    return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  }
+
+  function avatarColor(name) {
+    const colors = ["#1a4dff","#23ccda","#34c759","#ff9500","#af52de","#ff375f","#30b0c7"];
+    let hash = 0;
+    for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  function renderCelebratedCard(m) {
+    const col = avatarColor(m.name);
+    const milestone = m.key ? parseInt(m.key.split("|")[1]) : 0;
+    return `
+      <div class="member-card celebrated">
+        <div class="member-avatar" style="background:${col}22;color:${col}">${initials(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">⭐ ${m.name}</div>
+          <div class="member-meta">${m.total ? `${m.total} total sessions` : ""}</div>
+        </div>
+        <div class="milestone-badge" style="color:#34c759">${milestone}</div>
+        <div class="done-badge">✓ Done</div>
+      </div>
+    `;
+  }
+
+  function renderNextCard(m) {
+    const col = avatarColor(m.name);
+    const isCelebrated = m.celebrated;
+    return `
+      <div class="member-card next-up">
+        <div class="member-avatar" style="background:${col}22;color:${col}">${initials(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">${m.name}</div>
+          <div class="member-meta">${m.total !== "?" ? `${m.total} sessions` : "Sessions loading..."}</div>
+        </div>
+        <div class="milestone-badge" style="color:#f5c518">${m.milestone}</div>
+        ${isCelebrated
+          ? `<div class="done-badge">✓ ${isCelebrated.date}</div>`
+          : `<button class="celebrate-btn" onclick="openModal('${m.name}', ${m.milestone})">Mark Celebrated 🎉</button>`
+        }
+      </div>
+    `;
+  }
+
+  function renderImminentCard(m) {
+    const col = avatarColor(m.name);
+    const pct = Math.round(((m.total % 100) / 100) * 100);
+    return `
+      <div class="member-card imminent">
+        <div class="member-avatar" style="background:${col}22;color:${col}">${initials(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">${m.name}</div>
+          <div class="member-meta">${m.total} sessions · next: ${m.nextMilestone}</div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${pct}%;background:#ff9500"></div>
+          </div>
+          <div class="progress-label">${m.toNext} to go</div>
+        </div>
+        <div class="milestone-badge" style="color:#ff9500">${m.nextMilestone}</div>
+      </div>
+    `;
+  }
+
+  function renderAuth() {
+    document.getElementById("app").innerHTML = `
+      <div class="auth-screen">
+        <div style="font-size:48px">🔗</div>
+        <h2>Connect Go Team Up</h2>
+        <p>Authorise SPS Milestone Tracker to read your attendance data</p>
+        <button class="auth-btn" onclick="window.location='${state.auth_url}'">Connect Go Team Up</button>
+      </div>
+    `;
+  }
+
+  // ── Modal ────────────────────────────────────────────────────────────────
+  function openModal(name, milestone) {
+    pendingCelebrate = { name, milestone };
+    document.getElementById("modalTitle").textContent = `Mark ${name} as Celebrated`;
+    document.getElementById("modalSubtitle").textContent = `${milestone} session milestone 🎉`;
+    document.getElementById("modalName").value = "";
+    document.getElementById("modalNotes").value = "";
+    document.getElementById("modalOverlay").classList.add("show");
+  }
+
+  function closeModal() {
+    document.getElementById("modalOverlay").classList.remove("show");
+    pendingCelebrate = null;
+  }
+
+  async function confirmCelebrate() {
+    if (!pendingCelebrate) return;
+    const { name, milestone } = pendingCelebrate;
+    const by = document.getElementById("modalName").value || "SPS";
+    const notes = document.getElementById("modalNotes").value;
+
+    closeModal();
+
+    try {
+      const res = await fetch("/api/sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, milestone, celebrated_by: by, notes }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      state.celebrated[`${name}|${milestone}`] = { date: data.date, by };
+      render();
+      showToast(`🎉 ${name} — ${milestone} sessions celebrated!`);
+    } catch (e) {
+      showToast("⚠ Could not save — " + e.message);
+    }
+  }
+
+  // ── Toast ────────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  // Close modal on overlay click
+  document.getElementById("modalOverlay").addEventListener("click", function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  init();
+</script>
+</body>
+</html>
