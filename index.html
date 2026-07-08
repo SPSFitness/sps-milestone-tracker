@@ -502,10 +502,9 @@
       const res = await fetch("/api/sheets");
       const data = await res.json();
       state.celebrated = {};
-   for (const r of Object.values(data.records || {})) {
-        if (r.celebrated) {
-          state.celebrated[`${r.name}|${r.milestone}`] = { date: r.celebrated_date, by: r.celebrated_by };
-        }
+      const records = data.records || {};
+      for (const [key, r] of Object.entries(records)) {
+        state.celebrated[key] = { date: r.date, by: r.by };
       }
     } catch (e) {
       console.warn("Could not load sheets data", e);
@@ -561,6 +560,7 @@
     for (const seed of NEXT_TO_CELEBRATE_SEEDS) {
       const key = `${seed.name}|${seed.milestone}`;
       const alreadyCelebrated = state.celebrated[key];
+      if (alreadyCelebrated) continue;
       const member = state.members.find(m => m.name === seed.name) || { name: seed.name, total: "?", ptm: 0, gtu: 0 };
       nextToCelebrate.push({ ...member, milestone: seed.milestone, celebrated: alreadyCelebrated, key });
     }
