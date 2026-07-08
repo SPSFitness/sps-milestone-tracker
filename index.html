@@ -502,7 +502,7 @@
       const res = await fetch("/api/sheets");
       const data = await res.json();
       state.celebrated = {};
-      for (const r of data.records || []) {
+   for (const r of Object.values(data.records || {})) {
         if (r.celebrated) {
           state.celebrated[`${r.name}|${r.milestone}`] = { date: r.celebrated_date, by: r.celebrated_by };
         }
