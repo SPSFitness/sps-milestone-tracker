@@ -20,8 +20,13 @@ exports.handler = async (event) => {
     });
 
     if (event.httpMethod === "GET") {
-      const raw = await store.get("celebrated").catch(() => null);
-      const existing = raw ? JSON.parse(raw) : {};
+      let existing = {};
+      try {
+        const raw = await store.get("celebrated");
+        if (raw) existing = JSON.parse(raw);
+      } catch(e) {
+        console.log("No celebrated data yet:", e.message);
+      }
       return {
         statusCode: 200,
         headers,
@@ -37,14 +42,22 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing name or milestone" }) };
       }
 
-      const raw = await store.get("celebrated").catch(() => null);
-      const existing = raw ? JSON.parse(raw) : {};
+      let existing = {};
+      try {
+        const raw = await store.get("celebrated");
+        if (raw) existing = JSON.parse(raw);
+      } catch(e) {
+        console.log("Starting fresh celebrated store");
+      }
+
       const key = `${name}|${milestone}`;
       const date = new Date().toLocaleDateString("en-GB");
-
       existing[key] = { name, milestone, date, by: celebrated_by || "SPS", notes: notes || "" };
 
-      await store.set("celebrated", JSON.stringify(existing));
+      const toSave = JSON.stringify(existing);
+      console.log("Saving celebrated:", toSave);
+      await store.set("celebrated", toSave);
+      console.log("Saved successfully");
 
       return {
         statusCode: 200,
@@ -56,7 +69,7 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
 
   } catch (err) {
-    console.error(err);
+    console.error("sheets error:", err);
     return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
   }
 };
