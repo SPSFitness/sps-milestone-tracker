@@ -4,8 +4,9 @@
 [functions]
   node_bundler = "esbuild"
 
-[functions."gtu-sync"]
-  timeout = 30
+[functions."gtu-sync-background"]
+  timeout = 900
+  schedule = "@hourly"
 
 [[redirects]]
   from = "/api/*"
