@@ -66,34 +66,44 @@ exports.handler = async (event) => {
       token: process.env.NETLIFY_TOKEN,
     });
 
-    const cachedEventTypes = await store.get("event-types", { type: "json" }).catch(() => ({}));
-    const eventOfferingType = cachedEventTypes || {};
+    // Load cached event types only — this never changes
+    let eventOfferingType = {};
+    try {
+      const raw = await store.get("event-types");
+      if (raw) eventOfferingType = JSON.parse(raw);
+    } catch(e) {}
 
-    const customers = await fetchAllPages("https://goteamup.com/api/v2/customers?per_page=100");
+    // Always fetch fresh data from GTU
+    const [customers, attendances] = await Promise.all([
+      fetchAllPages("https://goteamup.com/api/v2/customers?per_page=100"),
+      fetchAllPages("https://goteamup.com/api/v2/attendances?per_page=100&status=attended"),
+    ]);
+
     const idToName = {};
     for (const c of customers) {
       idToName[c.id] = `${c.first_name} ${c.last_name}`.trim();
     }
 
-    const attendances = await fetchAllPages("https://goteamup.com/api/v2/attendances?per_page=100&status=attended");
-
+    // Look up any new event types not yet cached
     const unknownEventIds = [...new Set(attendances.map(a => a.event))].filter(id => !(id in eventOfferingType));
-
-    for (let i = 0; i < unknownEventIds.length; i += 10) {
-      const batch = unknownEventIds.slice(i, i + 10);
-      const evResults = await Promise.all(
-        batch.map(id =>
-          fetch(`https://goteamup.com/api/v2/events/${id}`, { headers: GTU_HEADERS })
-            .then(r => r.json()).catch(() => null)
-        )
-      );
-      for (const ev of evResults) {
-        if (ev && ev.id) eventOfferingType[ev.id] = ev.offering_type;
+    if (unknownEventIds.length > 0) {
+      for (let i = 0; i < unknownEventIds.length; i += 10) {
+        const batch = unknownEventIds.slice(i, i + 10);
+        const evResults = await Promise.all(
+          batch.map(id =>
+            fetch(`https://goteamup.com/api/v2/events/${id}`, { headers: GTU_HEADERS })
+              .then(r => r.json()).catch(() => null)
+          )
+        );
+        for (const ev of evResults) {
+          if (ev && ev.id) eventOfferingType[ev.id] = ev.offering_type;
+        }
       }
+      // Save updated event type cache
+      await store.set("event-types", JSON.stringify(eventOfferingType));
     }
 
-    await store.setJSON("event-types", eventOfferingType);
-
+    // Count attendances per customer for our 3 class types only
     const attendanceCounts = {};
     for (const a of attendances) {
       if (OFFERING_TYPES.has(eventOfferingType[a.event])) {
@@ -101,6 +111,7 @@ exports.handler = async (event) => {
       }
     }
 
+    // Build results
     const results = Object.entries(PT_MINDER).map(([name, ptm]) => {
       const custId = Object.keys(idToName).find(id => idToName[id] === name);
       const gtu = custId ? (attendanceCounts[parseInt(custId)] || 0) : 0;
@@ -115,40 +126,4 @@ exports.handler = async (event) => {
       if (name && !PT_MINDER[name] && count > 0) {
         const total = count;
         const lastMilestone = Math.floor(total / 100) * 100;
-        const nextMilestone = lastMilestone + 100;
-        results.push({ name, ptm: 0, gtu: count, total, lastMilestone, nextMilestone, toNext: nextMilestone - total });
-      }
-    }
-
-    results.sort((a, b) => a.toNext - b.toNext);
-
-    await store.setJSON("sync-result", {
-      members: results,
-      synced_at: new Date().toISOString(),
-    });
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ members: results, synced_at: new Date().toISOString() }),
-    };
-
-  } catch (err) {
-    console.error("sync error:", err);
-    try {
-      const store = getStore({
-        name: "milestones",
-        siteID: process.env.NETLIFY_SITE_ID,
-        token: process.env.NETLIFY_TOKEN,
-      });
-      const cached = await store.get("sync-result", { type: "json" });
-      if (cached) return { statusCode: 200, headers, body: JSON.stringify(cached) };
-    } catch {}
-
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message }),
-    };
-  }
-};
+        const nextMilestone = lastMilestone +
