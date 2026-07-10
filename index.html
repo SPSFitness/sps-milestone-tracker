@@ -549,12 +549,13 @@
     const nextToCelebrate = [];
     const imminent = [];
 
-    // Recently celebrated (from seeds)
-    for (const key of RECENTLY_CELEBRATED) {
-      const [name] = key.split("|");
+    // Recently celebrated — from Blobs store
+    for (const [key, data] of Object.entries(state.celebrated)) {
+      const [name, milestone] = key.split("|");
       const member = state.members.find(m => m.name === name) || { name, total: 0, gtu: 0, ptm: 0 };
-      recentlyCelebrated.push({ ...member, key });
+      recentlyCelebrated.push({ ...member, key, milestone: parseInt(milestone), celebrated_date: data.date });
     }
+    recentlyCelebrated.sort((a, b) => new Date(b.celebrated_date) - new Date(a.celebrated_date));
 
     // Next to celebrate seeds (not yet done)
     for (const seed of NEXT_TO_CELEBRATE_SEEDS) {
@@ -639,13 +640,13 @@
 
   function renderCelebratedCard(m) {
     const col = avatarColor(m.name);
-    const milestone = m.key ? parseInt(m.key.split("|")[1]) : 0;
+    const milestone = m.milestone || (m.key ? parseInt(m.key.split("|")[1]) : 0);
     return `
       <div class="member-card celebrated">
         <div class="member-avatar" style="background:${col}22;color:${col}">${initials(m.name)}</div>
         <div class="member-info">
           <div class="member-name">⭐ ${m.name}</div>
-          <div class="member-meta">${m.total ? `${m.total} total sessions` : ""}</div>
+          <div class="member-meta">${m.celebrated_date ? `Celebrated ${m.celebrated_date}` : m.total ? `${m.total} total sessions` : ""}</div>
         </div>
         <div class="milestone-badge" style="color:#34c759">${milestone}</div>
         <div class="done-badge">✓ Done</div>
