@@ -477,17 +477,7 @@
   // Recently celebrated (shown with ⭐)
   const RECENTLY_CELEBRATED = new Set(["Trey Kaur|200", "Sam Grove|200"]);
 
-  // Next to celebrate list (pre-seeded)
-  const NEXT_TO_CELEBRATE_SEEDS = [
-    { name: "Kelly Guest - Southwick", milestone: 200 },
-    { name: "Nicola Heath", milestone: 700 },
-    { name: "Richard Davis", milestone: 200 },
-    { name: "Rebecca Barnfield", milestone: 200 },
-    { name: "Jo Kennett", milestone: 100 },
-    { name: "Rebecca Houghton", milestone: 100 },
-    { name: "April Philips", milestone: 700 },
-    { name: "Sam Averall", milestone: 600 },
-  ];
+  // Next to celebrate is now fully dynamic — no seeds needed
 
   let pendingCelebrate = null;
 
@@ -543,13 +533,11 @@
   function render() {
     const app = document.getElementById("app");
 
-    // Categorise members
     const recentlyCelebrated = [];
-    const nextToCheck = new Set(NEXT_TO_CELEBRATE_SEEDS.map(s => `${s.name}|${s.milestone}`));
     const nextToCelebrate = [];
     const imminent = [];
 
-    // Recently celebrated — from Blobs store
+    // Recently celebrated — fully dynamic from state.celebrated
     for (const [key, data] of Object.entries(state.celebrated)) {
       const [name, milestone] = key.split("|");
       const member = state.members.find(m => m.name === name) || { name, total: 0, gtu: 0, ptm: 0 };
@@ -557,23 +545,25 @@
     }
     recentlyCelebrated.sort((a, b) => new Date(b.celebrated_date) - new Date(a.celebrated_date));
 
-    // Next to celebrate seeds (not yet done)
-    for (const seed of NEXT_TO_CELEBRATE_SEEDS) {
-      const key = `${seed.name}|${seed.milestone}`;
-      const alreadyCelebrated = state.celebrated[key];
-      if (alreadyCelebrated) continue;
-      const member = state.members.find(m => m.name === seed.name) || { name: seed.name, total: "?", ptm: 0, gtu: 0 };
-      nextToCelebrate.push({ ...member, milestone: seed.milestone, celebrated: alreadyCelebrated, key });
-    }
+    // Build sets of celebrated milestones for quick lookup
+    const celebratedKeys = new Set(Object.keys(state.celebrated));
+    const celebratedNames = new Set(recentlyCelebrated.map(m => m.name));
 
-    // Imminent — within 15, not in other lists
-    const trackedNames = new Set([
-      ...RECENTLY_CELEBRATED,
-      ...NEXT_TO_CELEBRATE_SEEDS.map(s => s.name),
-    ]);
-
+    // Next to celebrate — anyone whose total has crossed a milestone threshold
+    // but hasn't been celebrated for it yet
     for (const m of state.members) {
-      if (trackedNames.has(m.name)) continue;
+      if (m.lastMilestone === 0) continue; // hasn't hit 100 yet
+      const key = `${m.name}|${m.lastMilestone}`;
+      if (!celebratedKeys.has(key)) {
+        nextToCelebrate.push({ ...m, milestone: m.lastMilestone, key });
+      }
+    }
+    nextToCelebrate.sort((a, b) => b.milestone - a.milestone);
+
+    // Imminent — within 15 of next milestone, not already in next to celebrate
+    const ntcNames = new Set(nextToCelebrate.map(m => m.name));
+    for (const m of state.members) {
+      if (ntcNames.has(m.name)) continue;
       if (m.toNext <= 15) {
         imminent.push(m);
       }
