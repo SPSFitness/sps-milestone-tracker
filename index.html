@@ -537,28 +537,42 @@
     const nextToCelebrate = [];
     const imminent = [];
 
-    // Recently celebrated — fully dynamic from state.celebrated
+    // Recently celebrated — only show last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     for (const [key, data] of Object.entries(state.celebrated)) {
       const [name, milestone] = key.split("|");
-      const member = state.members.find(m => m.name === name) || { name, total: 0, gtu: 0, ptm: 0 };
-      recentlyCelebrated.push({ ...member, key, milestone: parseInt(milestone), celebrated_date: data.date });
+      const celebDate = data.date ? new Date(data.date.split("/").reverse().join("-")) : null;
+      if (celebDate && celebDate >= sevenDaysAgo) {
+        const member = state.members.find(m => m.name === name) || { name, total: 0, gtu: 0, ptm: 0 };
+        recentlyCelebrated.push({ ...member, key, milestone: parseInt(milestone), celebrated_date: data.date });
+      }
     }
-    recentlyCelebrated.sort((a, b) => new Date(b.celebrated_date) - new Date(a.celebrated_date));
+    recentlyCelebrated.sort((a, b) => new Date(b.celebrated_date.split("/").reverse().join("-")) - new Date(a.celebrated_date.split("/").reverse().join("-")));
 
     // Build sets of celebrated milestones for quick lookup
     const celebratedKeys = new Set(Object.keys(state.celebrated));
     const celebratedNames = new Set(recentlyCelebrated.map(m => m.name));
 
-    // Next to celebrate — anyone whose total has crossed a milestone threshold
-    // but hasn't been celebrated for it yet
+    // Next to celebrate — only show members whose MOST RECENT milestone
+    // hasn't been celebrated yet. Skip if their last milestone is already celebrated.
     for (const m of state.members) {
       if (m.lastMilestone === 0) continue; // hasn't hit 100 yet
       const key = `${m.name}|${m.lastMilestone}`;
+      // Only add if this specific milestone hasn't been celebrated
       if (!celebratedKeys.has(key)) {
-        nextToCelebrate.push({ ...m, milestone: m.lastMilestone, key });
+        // Check if ANY higher milestone has been celebrated for this person
+        // If so, they don't need celebrating for lower ones
+        const hasHigherCelebrated = [...celebratedKeys].some(k => {
+          const [kName, kMilestone] = k.split("|");
+          return kName === m.name && parseInt(kMilestone) >= m.lastMilestone;
+        });
+        if (!hasHigherCelebrated) {
+          nextToCelebrate.push({ ...m, milestone: m.lastMilestone, key });
+        }
       }
     }
-    nextToCelebrate.sort((a, b) => b.milestone - a.milestone);
+    nextToCelebrate.sort((a, b) => b.total - a.total);
 
     // Imminent — within 15 of next milestone, not already in next to celebrate
     const ntcNames = new Set(nextToCelebrate.map(m => m.name));
